@@ -1,0 +1,53 @@
+plugins {
+    id 'scala'
+}
+
+group = 'com.przemyslawsikora.glasswing'
+version = '0.1.0-SNAPSHOT'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+def mainClass = 'com.przemyslawsikora.glasswing.mstats.MeasurementStatsProducer'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'org.scala-lang:scala-library:2.11.8'
+    compileOnly 'org.apache.spark:spark-core_2.11:2.4.0'
+    compileOnly 'org.apache.spark:spark-sql_2.11:2.4.0'
+    compileOnly 'org.apache.spark:spark-streaming_2.11:2.4.0'
+    compileOnly 'com.github.plokhotnyuk.jsoniter-scala:jsoniter-scala-macros_2.11:0.37.7'
+    compile 'org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.0'
+    compile 'com.github.plokhotnyuk.jsoniter-scala:jsoniter-scala-core_2.11:0.37.7'
+}
+
+jar {
+    zip64 true
+    archiveName = "${project.name}-${version}.jar"
+    from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+}
+
+task run(type: Exec) {
+    def exec
+    if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        exec = ['cmd', '/c', 'spark-submit']
+    } else {
+        exec = ['./spark-submit']
+    }
+    def args = ['--class', mainClass,
+                '--master', 'local[*]',
+                '--executor-memory', '4g',
+                '--driver-memory', '4g',
+                '--conf', 'spark.executor.memoryOverhead=409',
+                '--conf', 'spark.sql.shuffle.partitions=8',
+                "${libsDir}/${jar.archiveName}".toString(),
+                '192.168.0.100:9092']
+    def cmdLine = exec + args
+    commandLine(*cmdLine)
+}
